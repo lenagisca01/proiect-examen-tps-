@@ -6,44 +6,58 @@
     <title>Go-Ride | Sistem cont utilizator - ride-sharing modern</title>
     <meta name="description" content="Go-Ride - serviciu de ride-sharing. Înregistrare cu e-mail sau telefon, autentificare și recuperare parolă. Călătorește sigur.">
     
-    <!-- ТОЛЬКО preconnect для шрифтов -->
+    <!-- Только критический preconnect -->
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
     <link rel="preconnect" href="https://unpkg.com">
     
-    <!-- Font Awesome с media="print" (не блокирует рендеринг) -->
+    <!-- Font Awesome с media="print" (НЕ блокирует) и font-display:swap через data-атрибут -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" media="print" onload="this.media='all';this.onload=null">
     <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"></noscript>
     
-    <!-- Leaflet CSS не блокирует -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" media="print" onload="this.media='all';this.onload=null">
+    <!-- Исправление font-display для Font Awesome (добавляем локально) -->
+    <style>
+    /* Принудительный font-display:swap для Font Awesome */
+    @font-face {
+        font-family: 'Font Awesome 6 Free';
+        font-style: normal;
+        font-weight: 900;
+        font-display: swap;
+        src: url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/webfonts/fa-solid-900.woff2') format('woff2');
+    }
     
-    <!-- Leaflet JS с defer -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+    @font-face {
+        font-family: 'Font Awesome 6 Brands';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/webfonts/fa-brands-400.woff2') format('woff2');
+    }
     
-    <!-- Google Fonts загружается через JS после загрузки страницы -->
+    /* Системный шрифт сразу */
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    </style>
+    
+    <!-- Google Fonts загружается ТОЛЬКО после полной загрузки страницы -->
     <script>
-    // Загружаем шрифт только после полной загрузки страницы
     window.addEventListener('load', function() {
         var link = document.createElement('link');
         link.rel = 'stylesheet';
         link.href = 'https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap';
+        link.onload = function() { document.documentElement.classList.add('fonts-loaded'); };
         document.head.appendChild(link);
     });
     </script>
     
     <style>
-    /* ============ СИСТЕМНЫЙ ШРИФТ КАК ЗАПАСНОЙ (НЕ БЛОКИРУЕТ) ============ */
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    }
-    
-    /* Когда Google Font загрузится, он применится автоматически */
+    /* Когда Google Font загрузится */
     .fonts-loaded body {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     
-    /* ============ RESET & VARIABILE ============ */
+    /* ============ CSS VARIABLES ============ */
     :root {
         --primary: #f5b042;
         --primary-hover: #e69c2e;
@@ -72,7 +86,7 @@
         --shadow: 0 4px 20px rgba(0,0,0,0.08);
         --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
         --shadow-primary: 0 4px 12px rgba(245,176,66,0.3);
-        --transition: 0.25s ease;
+        --transition: 0.2s ease;
     }
 
     *,
@@ -102,7 +116,7 @@
         padding: 0 24px;
     }
 
-    /* ============ BUTOANE ============ */
+    /* ============ BUTTONS ============ */
     .btn {
         display: inline-flex;
         align-items: center;
@@ -341,7 +355,7 @@
         color: var(--gray-light);
     }
 
-    /* Hero illustration - emblemă centrală */
+    /* Hero illustration */
     .hero-illustration { 
         flex: 1;
         text-align: center;
@@ -431,6 +445,7 @@
         font-size: 1.8rem;
     }
 
+    /* ============ ANIMATIONS (только transform + opacity) ============ */
     @keyframes floatCar {
         0%, 100% { transform: translateY(0px) rotate(0deg); }
         30% { transform: translateY(-15px) rotate(4deg); }
@@ -439,8 +454,8 @@
     }
 
     @keyframes logoPulse {
-        0%, 100% { transform: scale(1); box-shadow: 0 20px 50px rgba(245,176,66,0.4); }
-        50% { transform: scale(1.05); box-shadow: 0 25px 60px rgba(245,176,66,0.6); }
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
     }
 
     @keyframes rotateDashed {
@@ -458,7 +473,7 @@
         to { opacity: 1; transform: translateY(0); }
     }
 
-    /* ============ CARDURI COMUNE ============ */
+    /* ============ CARDS ============ */
     .booking-card, .auth-card, .route-card {
         background: var(--white);
         border-radius: var(--radius-xl);
@@ -474,7 +489,7 @@
         margin-right: auto;
     }
 
-    /* ============ FORMULARE ============ */
+    /* ============ FORMS ============ */
     .form-group {
         margin-bottom: 16px;
     }
@@ -552,7 +567,6 @@
     .message.error { background: var(--error-bg); color: #991b1b; }
     .message.success { background: var(--success-bg); color: #166534; }
 
-    /* ============ FORM ROW ============ */
     .form-row {
         display: flex;
         gap: 16px;
@@ -576,7 +590,7 @@
         color: var(--dark-secondary);
     }
 
-    /* ============ RUTE ============ */
+    /* ============ ROUTES ============ */
     .route-option {
         border: 2px solid #eef2ff;
         border-radius: 20px;
@@ -623,7 +637,7 @@
         color: #b45309;
     }
 
-    /* ============ PLĂȚI ============ */
+    /* ============ PAYMENTS ============ */
     .payment-method-card {
         border: 2px solid var(--border);
         border-radius: 16px;
@@ -652,7 +666,7 @@
         font-family: inherit;
     }
 
-    /* ============ NOTIFICĂRI ============ */
+    /* ============ NOTIFICATIONS ============ */
     .notification {
         background: var(--white);
         border-radius: var(--radius);
@@ -707,7 +721,7 @@
         margin-top: 8px;
     }
 
-    /* ============ ISTORIC ============ */
+    /* ============ HISTORY ============ */
     .history-list {
         max-height: 350px;
         overflow-y: auto;
@@ -754,7 +768,7 @@
         border: 2px solid var(--primary);
     }
 
-    /* ============ TARIFE ============ */
+    /* ============ TARIFFS ============ */
     .tariff-grid {
         display: flex;
         flex-wrap: wrap;
@@ -797,7 +811,7 @@
         gap: 20px;
     }
 
-    /* ============ LEAFLET ============ */
+    /* ============ LEAFLET (loaded only when needed) ============ */
     .leaflet-container {
         border-radius: 20px;
         z-index: 1;
@@ -825,7 +839,7 @@
         max-width: 90%;
     }
 
-    /* ============ MEDIA QUERIES ============ */
+    /* ============ RESPONSIVE ============ */
     @media (max-width: 900px) {
         .nav-links { display: none; }
         .nav-links.show {
@@ -1088,14 +1102,28 @@
 </footer>
 
 <script>
-// ============ STARE ============
+// ============ STATE ============
 let users = JSON.parse(localStorage.getItem('goRideUsers')) || [];
 let currentUser = JSON.parse(sessionStorage.getItem('goRideCurrentUser')) || null;
 let currentRoutes = [], selectedRouteIndex = 0, selectedPaymentMethod = null;
 let currentRideDetails = null, selectedDriver = null;
 let map = null, driverMarker = null, userMarker = null, trackingInterval = null;
+let leafletLoaded = false;
 
-// ============ UTILITARE ============
+// ============ DYNAMIC LEAFLET LOADING ============
+function loadLeaflet() {
+    return new Promise((resolve) => {
+        if (leafletLoaded && window.L) { resolve(); return; }
+        if (window.L) { leafletLoaded = true; resolve(); return; }
+        
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.onload = () => { leafletLoaded = true; resolve(); };
+        document.head.appendChild(script);
+    });
+}
+
+// ============ UTILITIES ============
 function saveUsers() { localStorage.setItem('goRideUsers', JSON.stringify(users)); }
 
 function showAuthMessage(text, isError = true) {
@@ -1121,7 +1149,8 @@ function showNotification(title, message, type = 'info', duration = 5000) {
 
 function haversine(lat1, lon1, lat2, lon2) {
     const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
-    return R * 2 * Math.atan2(Math.sqrt(Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2), Math.sqrt(1 - (Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2)));
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
 function estimateWait(d) { return Math.round(d / 30 * 60); }
@@ -1171,7 +1200,7 @@ function detectLocation() {
     }, () => { btn.innerHTML = orig; btn.disabled = false; });
 }
 
-// ============ RUTE ============
+// ============ ROUTES ============
 function displayRoutes(routes, start, end) {
     const container = document.getElementById('routesContainer'), list = document.getElementById('routesList');
     if (!container || !list) return;
@@ -1235,7 +1264,7 @@ async function planRoutes() {
     } finally { loading.style.display='none'; }
 }
 
-// ============ ȘOFERI ============
+// ============ DRIVERS ============
 const driversDB = [
     { id:1, name:'Andrei M.', rating:4.9, car:'Hyundai Elantra', type:'Economy', lat:47.0105, lon:28.8638, phone:'+373 69 123 456', avatar:'https://i.pravatar.cc/50?img=1' },
     { id:2, name:'Irina C.', rating:4.8, car:'Skoda Octavia', type:'Comfort', lat:47.0150, lon:28.8570, phone:'+373 68 234 567', avatar:'https://i.pravatar.cc/50?img=2' },
@@ -1284,7 +1313,7 @@ function showRideDetails(route, driver, start, end, price) {
     panel.scrollIntoView({ behavior: 'smooth' });
 }
 
-// ============ PLĂȚI ============
+// ============ PAYMENTS ============
 function showPayment(amount, details, cb) {
     const panel = document.getElementById('paymentPanel'), content = document.getElementById('paymentContent');
     if (!panel||!content) return;
@@ -1320,8 +1349,9 @@ function showPayment(amount, details, cb) {
     });
 }
 
-// ============ HARTĂ ============
-function initMap(uLat, uLon, dLat, dLon) {
+// ============ MAP & TRACKING ============
+async function initMap(uLat, uLon, dLat, dLon) {
+    await loadLeaflet();
     if (map) map.remove();
     map = L.map('map').setView([uLat, uLon], 13);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
@@ -1350,7 +1380,7 @@ function startTracking(driver, uLat, uLon) {
     }, 1500);
 }
 
-function confirmFinalRide() {
+async function confirmFinalRide() {
     if (!currentRideDetails) return;
     currentRideDetails.date = new Date().toISOString();
     showPayment(currentRideDetails.priceDetails.total, currentRideDetails, async () => {
@@ -1359,7 +1389,7 @@ function confirmFinalRide() {
             document.getElementById('trackingPanel').style.display = 'block';
             document.getElementById('statusText').textContent = 'În drum';
             document.getElementById('trackingDriverName').textContent = currentRideDetails.driver.name;
-            initMap(geo.lat, geo.lon, currentRideDetails.driver.lat, currentRideDetails.driver.lon);
+            await initMap(geo.lat, geo.lon, currentRideDetails.driver.lat, currentRideDetails.driver.lon);
             startTracking(currentRideDetails.driver, geo.lat, geo.lon);
         }
         document.getElementById('rideDetailsPanel').style.display = 'none';
@@ -1399,7 +1429,7 @@ function closeRating() {
     document.getElementById('ratingOverlay').style.display = 'none';
 }
 
-// ============ ISTORIC ============
+// ============ HISTORY ============
 function saveRideToHistory(details) {
     if (!currentUser||!details) return;
     const history = JSON.parse(localStorage.getItem(`goRideHistory_${currentUser.id}`)||'[]');
@@ -1435,7 +1465,7 @@ function clearRideHistory() {
     displayRideHistory();
 }
 
-// ============ AUTENTIFICARE ============
+// ============ AUTH ============
 function updateNavAndUI() {
     const navBtns = document.getElementById('navButtons'), authCard = document.getElementById('authCard'), userPanel = document.getElementById('userPanel');
     if (currentUser) {
@@ -1478,31 +1508,19 @@ function confirmReset(code, pass) {
 }
 
 function switchToLoginForm() {
-    document.getElementById('loginForm').style.display='block';
-    document.getElementById('registerForm').style.display='none';
-    document.getElementById('forgotForm').style.display='none';
-    document.getElementById('loginTabBtn').classList.add('active');
-    document.getElementById('registerTabBtn').classList.remove('active');
-    document.getElementById('forgotTabBtn').classList.remove('active');
+    ['loginForm','registerForm','forgotForm'].forEach((id,i)=>{ const el=document.getElementById(id); if(el)el.style.display=i===0?'block':'none'; });
+    ['loginTabBtn','registerTabBtn','forgotTabBtn'].forEach((id,i)=>{ const el=document.getElementById(id); if(el){el.classList.toggle('active',i===0);el.setAttribute('aria-selected',i===0);} });
     document.getElementById('resetCodeSection').style.display='none';
 }
 
 function switchToRegisterForm() {
-    document.getElementById('loginForm').style.display='none';
-    document.getElementById('registerForm').style.display='block';
-    document.getElementById('forgotForm').style.display='none';
-    document.getElementById('registerTabBtn').classList.add('active');
-    document.getElementById('loginTabBtn').classList.remove('active');
-    document.getElementById('forgotTabBtn').classList.remove('active');
+    ['loginForm','registerForm','forgotForm'].forEach((id,i)=>{ const el=document.getElementById(id); if(el)el.style.display=i===1?'block':'none'; });
+    ['loginTabBtn','registerTabBtn','forgotTabBtn'].forEach((id,i)=>{ const el=document.getElementById(id); if(el){el.classList.toggle('active',i===1);el.setAttribute('aria-selected',i===1);} });
 }
 
 function switchToForgotForm() {
-    document.getElementById('loginForm').style.display='none';
-    document.getElementById('registerForm').style.display='none';
-    document.getElementById('forgotForm').style.display='block';
-    document.getElementById('forgotTabBtn').classList.add('active');
-    document.getElementById('loginTabBtn').classList.remove('active');
-    document.getElementById('registerTabBtn').classList.remove('active');
+    ['loginForm','registerForm','forgotForm'].forEach((id,i)=>{ const el=document.getElementById(id); if(el)el.style.display=i===2?'block':'none'; });
+    ['loginTabBtn','registerTabBtn','forgotTabBtn'].forEach((id,i)=>{ const el=document.getElementById(id); if(el){el.classList.toggle('active',i===2);el.setAttribute('aria-selected',i===2);} });
 }
 
 // ============ INIT ============
