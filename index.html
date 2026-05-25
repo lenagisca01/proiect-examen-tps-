@@ -812,10 +812,25 @@
     }
 
     /* ============ LEAFLET (loaded only when needed) ============ */
-    .leaflet-container {
+    .map-container {
+        position: relative;
+        width: 100%;
+        height: 0;
+        padding-bottom: 56.25%; /* 16:9 aspect ratio - РОВНОЕ соотношение */
+        border-radius: 20px;
+        overflow: hidden;
+        background: #f1f5f9;
+        margin-bottom: 12px;
+    }
+    
+    #map {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
         border-radius: 20px;
         z-index: 1;
-        background: #f1f5f9;
     }
 
     /* ============ OVERLAY ============ */
@@ -999,7 +1014,9 @@
     <div class="container" id="trackingPanel" style="display:none;margin-top:24px;">
         <div class="route-card">
             <h3><i class="fas fa-map"></i> Urmărire cursă în timp real</h3>
-            <div id="map" style="height:350px;border-radius:20px;margin-bottom:12px;" role="application" aria-label="Hartă urmărire cursă"></div>
+            <div class="map-container" role="application" aria-label="Hartă urmărire cursă">
+                <div id="map"></div>
+            </div>
             <div id="rideStatus" style="padding:12px;background:#f1f5f9;border-radius:16px;margin-top:12px;" role="status">
                 <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;">
                     <span><strong>Status:</strong> <span id="statusText">Așteptare</span></span>
@@ -1110,6 +1127,100 @@ let currentRideDetails = null, selectedDriver = null;
 let map = null, driverMarker = null, userMarker = null, trackingInterval = null;
 let leafletLoaded = false;
 
+// ============ NOTIFICATION SYSTEM ============
+function showNotification(title, message, type = 'info', duration = 5000) {
+    const panel = document.getElementById('notificationsPanel');
+    if (!panel) return;
+    
+    const icons = {
+        info: 'fa-info-circle',
+        success: 'fa-check-circle',
+        warning: 'fa-exclamation-triangle',
+        error: 'fa-times-circle'
+    };
+    
+    const colors = {
+        info: '#3b82f6',
+        success: '#10b981',
+        warning: '#f59e0b',
+        error: '#dc2626'
+    };
+    
+    const el = document.createElement('div');
+    el.className = 'notification ' + type;
+    el.style.borderLeftColor = colors[type] || colors.info;
+    el.innerHTML = `
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+            <i class="fas ${icons[type]}" style="color:${colors[type]};font-size:1.2rem;margin-top:2px;"></i>
+            <div style="flex:1;">
+                <strong style="color:#0f172a;">${title}</strong>
+                <p style="margin:4px 0 0;font-size:0.85rem;color:#475569;">${message}</p>
+            </div>
+            <button class="notification-close" aria-label="Închide notificarea">&times;</button>
+        </div>
+        <div class="notification-progress" style="position:absolute;bottom:0;left:0;height:3px;background:${colors[type]};animation:notificationProgress ${duration}ms linear forwards;"></div>
+    `;
+    
+    panel.appendChild(el);
+    
+    // Add progress bar animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes notificationProgress {
+            from { width: 100%; }
+            to { width: 0%; }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Close button handler
+    el.querySelector('.notification-close').addEventListener('click', () => {
+        el.style.animation = 'fadeIn 0.3s ease reverse';
+        setTimeout(() => el.remove(), 300);
+    });
+    
+    // Auto remove after duration
+    setTimeout(() => {
+        if (el.parentNode) {
+            el.style.animation = 'fadeIn 0.3s ease reverse';
+            setTimeout(() => el.remove(), 300);
+        }
+    }, duration);
+    
+    // Play sound for important notifications
+    if (type === 'error' || type === 'warning') {
+        playNotificationSound(type);
+    }
+}
+
+function playNotificationSound(type) {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        if (type === 'error') {
+            oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+            oscillator.frequency.setValueAtTime(150, audioContext.currentTime + 0.1);
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        } else {
+            oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+            oscillator.frequency.setValueAtTime(500, audioContext.currentTime + 0.1);
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        }
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+    } catch (e) {
+        // Audio not supported
+    }
+}
+
 // ============ DYNAMIC LEAFLET LOADING ============
 function loadLeaflet() {
     return new Promise((resolve) => {
@@ -1132,19 +1243,16 @@ function showAuthMessage(text, isError = true) {
     msgDiv.textContent = text;
     msgDiv.className = 'message ' + (isError ? 'error' : 'success');
     msgDiv.style.display = 'block';
+    
+    // Also show as notification
+    showNotification(
+        isError ? 'Eroare autentificare' : 'Succes',
+        text,
+        isError ? 'error' : 'success',
+        4000
+    );
+    
     setTimeout(() => { if (msgDiv) msgDiv.style.display = 'none'; }, 4000);
-}
-
-function showNotification(title, message, type = 'info', duration = 5000) {
-    const panel = document.getElementById('notificationsPanel');
-    if (!panel) return;
-    const icons = { info: 'fa-info-circle', success: 'fa-check-circle', warning: 'fa-exclamation-triangle', error: 'fa-times-circle' };
-    const el = document.createElement('div');
-    el.className = 'notification ' + type;
-    el.innerHTML = `<div style="display:flex;gap:10px;"><i class="fas ${icons[type]}"></i><div style="flex:1;"><strong>${title}</strong><p style="margin:4px 0 0;font-size:0.85rem;">${message}</p></div><button class="notification-close">&times;</button></div>`;
-    panel.appendChild(el);
-    el.querySelector('.notification-close').addEventListener('click', () => el.remove());
-    setTimeout(() => { if (el.parentNode) el.remove(); }, duration);
 }
 
 function haversine(lat1, lon1, lat2, lon2) {
@@ -1169,7 +1277,9 @@ async function geocode(addr) {
         const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1&accept-language=ro`);
         const d = await r.json();
         if (d.length) return { lat: +d[0].lat, lon: +d[0].lon };
-    } catch(e) {}
+    } catch(e) {
+        showNotification('Eroare geocodare', 'Nu s-a putut găsi adresa. Verificați conexiunea.', 'error');
+    }
     return null;
 }
 
@@ -1177,14 +1287,21 @@ async function getOSRMRoutes(sLon, sLat, eLon, eLat) {
     try {
         const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${sLon},${sLat};${eLon},${eLat}?overview=false&geometries=geojson&alternatives=true&steps=false`);
         return (await r.json()).routes || null;
-    } catch(e) { return null; }
+    } catch(e) { 
+        showNotification('Eroare rutare', 'Nu s-au putut calcula rutele. Încercați din nou.', 'warning');
+        return null; 
+    }
 }
 
 function detectLocation() {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+        showNotification('Locație indisponibilă', 'Browser-ul nu suportă geolocația.', 'error');
+        return;
+    }
     const btn = document.getElementById('detectStartBtn'), orig = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Se caută...';
     btn.disabled = true;
+    
     navigator.geolocation.getCurrentPosition(async pos => {
         try {
             const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&zoom=18&addressdetails=1&accept-language=ro`);
@@ -1195,9 +1312,17 @@ function detectLocation() {
                 if (parts.length) addr = parts.join(', ');
             }
             document.getElementById('startPoint').value = addr;
-        } catch { document.getElementById('startPoint').value = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`; }
+            showNotification('Locație detectată', 'Adresa a fost completată automat.', 'success', 3000);
+        } catch { 
+            document.getElementById('startPoint').value = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
+            showNotification('Locație detectată', 'Coordonatele au fost completate.', 'info', 3000);
+        }
         finally { btn.innerHTML = orig; btn.disabled = false; }
-    }, () => { btn.innerHTML = orig; btn.disabled = false; });
+    }, () => { 
+        btn.innerHTML = orig; 
+        btn.disabled = false;
+        showNotification('Eroare locație', 'Nu s-a putut detecta locația. Verificați permisiunile.', 'error');
+    });
 }
 
 // ============ ROUTES ============
@@ -1205,7 +1330,12 @@ function displayRoutes(routes, start, end) {
     const container = document.getElementById('routesContainer'), list = document.getElementById('routesList');
     if (!container || !list) return;
     list.innerHTML = '';
-    if (!routes?.length) { list.innerHTML = '<p>Nu s-au putut genera rute.</p>'; container.style.display='block'; return; }
+    if (!routes?.length) { 
+        list.innerHTML = '<p>Nu s-au putut genera rute.</p>'; 
+        container.style.display='block';
+        showNotification('Fără rute', 'Nu s-au găsit rute disponibile pentru această destinație.', 'warning');
+        return; 
+    }
     currentRoutes = routes;
     routes.forEach((r, i) => {
         const km = (r.distance/1000).toFixed(1), min = Math.round(r.duration/60);
@@ -1222,6 +1352,7 @@ function displayRoutes(routes, start, end) {
     });
     container.style.display = 'block';
     updateSelectedInfo(routes[selectedRouteIndex], start, end);
+    showNotification('Rute găsite', `S-au găsit ${routes.length} rute disponibile.`, 'success', 3000);
 }
 
 function updateSelectedInfo(route, start, end) {
@@ -1242,7 +1373,10 @@ function updateSelectedInfo(route, start, end) {
 
 async function planRoutes() {
     const start = document.getElementById('startPoint').value.trim(), end = document.getElementById('endPoint').value.trim();
-    if (!start || !end) return;
+    if (!start || !end) {
+        showNotification('Câmpuri goale', 'Completați punctul de plecare și destinația.', 'warning');
+        return;
+    }
     const loading = document.getElementById('loadingIndicator');
     loading.style.display='block';
     document.getElementById('routesContainer').style.display='none';
@@ -1281,6 +1415,12 @@ function showDrivers(drivers, pickup) {
     const container = document.getElementById('nearbyDriversContainer'), list = document.getElementById('driversList');
     if (!container||!list) return;
     list.innerHTML = '';
+    
+    if (drivers.length === 0) {
+        list.innerHTML = '<p>Nu s-au găsit șoferi disponibili în zonă.</p>';
+        showNotification('Fără șoferi', 'Nu există șoferi disponibili în apropiere.', 'warning');
+    }
+    
     drivers.forEach(d => {
         const stars = '★'.repeat(Math.floor(d.rating))+'☆'.repeat(5-Math.floor(d.rating));
         const card = document.createElement('div');
@@ -1291,6 +1431,10 @@ function showDrivers(drivers, pickup) {
         list.appendChild(card);
     });
     container.style.display = 'block';
+    
+    if (drivers.length > 0) {
+        showNotification('Șoferi găsiți', `S-au găsit ${drivers.length} șoferi disponibili.`, 'success', 3000);
+    }
 }
 
 function selectDriver(driver, pickup) {
@@ -1302,6 +1446,8 @@ function selectDriver(driver, pickup) {
     const price = calcDynamicPrice(route.distance/1000, Math.round(route.duration/60));
     info.innerHTML = `<div style="display:flex;align-items:center;gap:12px;"><img src="${driver.avatar}" alt="${driver.name}" class="driver-avatar" style="width:50px;height:50px;" loading="lazy"><div><strong>${driver.name}</strong><br>${driver.car} · ${driver.phone}</div></div><hr><strong>Preț: ${price.total} lei</strong><br><button id="viewFullDetailsBtn" class="btn btn-primary" style="margin-top:10px;width:100%;">Vezi detaliile complete</button>`;
     document.getElementById('viewFullDetailsBtn').addEventListener('click', () => showRideDetails(route, driver, pickup, document.getElementById('endPoint').value, price));
+    
+    showNotification('Șofer selectat', `${driver.name} - ${driver.car}`, 'info', 3000);
 }
 
 function showRideDetails(route, driver, start, end, price) {
@@ -1343,8 +1489,12 @@ function showPayment(amount, details, cb) {
     
     document.getElementById('processPaymentBtn').addEventListener('click', () => {
         if (selectedPaymentMethod === 'card' && (document.getElementById('cardNumber')?.value||'').replace(/\s/g,'').length < 15) {
-            document.getElementById('paymentError').textContent = 'Număr card invalid'; return;
+            document.getElementById('paymentError').textContent = 'Număr card invalid';
+            showNotification('Eroare plată', 'Numărul cardului este invalid.', 'error');
+            return;
         }
+        
+        showNotification('Plată procesată', `Plata de ${amount} lei a fost procesată cu succes.`, 'success');
         setTimeout(() => { panel.style.display = 'none'; if(cb)cb(); }, 1000);
     });
 }
@@ -1353,27 +1503,77 @@ function showPayment(amount, details, cb) {
 async function initMap(uLat, uLon, dLat, dLon) {
     await loadLeaflet();
     if (map) map.remove();
-    map = L.map('map').setView([uLat, uLon], 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
-    userMarker = L.marker([uLat, uLon], { icon: L.divIcon({ html: '<div style="background:#3b82f6;width:20px;height:20px;border-radius:50%;border:2px solid white;"></div>', iconSize:[20,20] }) }).addTo(map);
-    driverMarker = L.marker([dLat, dLon], { icon: L.divIcon({ html: '<div style="background:#f5b042;width:24px;height:24px;border-radius:50%;border:2px solid white;"></div>', iconSize:[24,24] }) }).addTo(map);
-    map.fitBounds(L.latLngBounds([[uLat,uLon],[dLat,dLon]]), { padding:[40,40] });
+    
+    // Initialize map in the container
+    map = L.map('map', {
+        center: [uLat, uLon],
+        zoom: 13,
+        zoomControl: true
+    });
+    
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { 
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+    
+    // Add markers
+    userMarker = L.marker([uLat, uLon], { 
+        icon: L.divIcon({ 
+            html: '<div style="background:#3b82f6;width:20px;height:20px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>', 
+            iconSize:[20,20],
+            className: ''
+        }) 
+    }).addTo(map);
+    
+    driverMarker = L.marker([dLat, dLon], { 
+        icon: L.divIcon({ 
+            html: '<div style="background:#f5b042;width:24px;height:24px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>', 
+            iconSize:[24,24],
+            className: ''
+        }) 
+    }).addTo(map);
+    
+    // Fit bounds to show both markers
+    const bounds = L.latLngBounds([[uLat, uLon], [dLat, dLon]]);
+    map.fitBounds(bounds, { padding: [50, 50] });
+    
+    // Invalidate size after a small delay to ensure proper rendering
+    setTimeout(() => {
+        map.invalidateSize();
+    }, 100);
 }
 
 function startTracking(driver, uLat, uLon) {
     if (trackingInterval) clearInterval(trackingInterval);
+    
+    showNotification('Cursă începută', `${driver.name} este în drum spre dumneavoastră.`, 'info');
+    
     let step = 0;
-    const steps = 20, dLat = (uLat-driver.lat)/steps, dLon = (uLon-driver.lon)/steps;
+    const steps = 20;
+    const dLat = (uLat - driver.lat) / steps;
+    const dLon = (uLon - driver.lon) / steps;
+    
     trackingInterval = setInterval(() => {
         step++;
-        const nLat = driver.lat + dLat*step, nLon = driver.lon + dLon*step;
-        if (driverMarker) driverMarker.setLatLng([nLat, nLon]);
+        const nLat = driver.lat + dLat * step;
+        const nLon = driver.lon + dLon * step;
+        
+        if (driverMarker) {
+            driverMarker.setLatLng([nLat, nLon]);
+        }
+        
         const rem = haversine(nLat, nLon, uLat, uLon);
-        document.getElementById('distanceRemaining').textContent = rem.toFixed(1)+' km';
-        document.getElementById('timeRemaining').textContent = estimateWait(rem)+' min';
+        document.getElementById('distanceRemaining').textContent = rem.toFixed(1) + ' km';
+        document.getElementById('timeRemaining').textContent = estimateWait(rem) + ' min';
+        
+        if (step === Math.floor(steps / 2)) {
+            document.getElementById('statusText').textContent = 'Aproape de destinație';
+            showNotification('Status cursă', 'Șoferul se apropie de destinație.', 'info', 3000);
+        }
+        
         if (step >= steps) {
             clearInterval(trackingInterval);
             document.getElementById('statusText').textContent = 'Finalizată';
+            showNotification('Cursă finalizată', 'Ați ajuns la destinație. Vă rugăm să evaluați cursa.', 'success');
             setTimeout(() => showRatingDialog(driver, currentRideDetails), 2000);
             saveRideToHistory(currentRideDetails);
         }
@@ -1382,13 +1582,23 @@ function startTracking(driver, uLat, uLon) {
 
 async function confirmFinalRide() {
     if (!currentRideDetails) return;
+    
+    if (!currentUser) {
+        showNotification('Autentificare necesară', 'Trebuie să vă autentificați pentru a comanda o cursă.', 'warning');
+        document.getElementById('cont').scrollIntoView({ behavior: 'smooth' });
+        return;
+    }
+    
     currentRideDetails.date = new Date().toISOString();
+    
     showPayment(currentRideDetails.priceDetails.total, currentRideDetails, async () => {
         const geo = await geocode(currentRideDetails.startAddr);
         if (geo && currentRideDetails.driver) {
             document.getElementById('trackingPanel').style.display = 'block';
             document.getElementById('statusText').textContent = 'În drum';
             document.getElementById('trackingDriverName').textContent = currentRideDetails.driver.name;
+            document.getElementById('trackingPanel').scrollIntoView({ behavior: 'smooth' });
+            
             await initMap(geo.lat, geo.lon, currentRideDetails.driver.lat, currentRideDetails.driver.lon);
             startTracking(currentRideDetails.driver, geo.lat, geo.lon);
         }
@@ -1397,9 +1607,11 @@ async function confirmFinalRide() {
 }
 
 function cancelRide() {
-    if (confirm('Anulați?')) {
+    if (confirm('Sunteți sigur că doriți să anulați comanda?')) {
         document.getElementById('rideDetailsPanel').style.display = 'none';
-        currentRideDetails = null; selectedDriver = null;
+        showNotification('Comandă anulată', 'Comanda a fost anulată cu succes.', 'info');
+        currentRideDetails = null; 
+        selectedDriver = null;
     }
 }
 
@@ -1413,11 +1625,15 @@ function showRatingDialog(driver, details) {
     
     document.getElementById('submitRatingBtn').onclick = () => {
         const r = document.querySelector('input[name="rating"]:checked');
-        if (!r) return;
+        if (!r) {
+            showNotification('Evaluare necesară', 'Selectați un rating înainte de a trimite.', 'warning');
+            return;
+        }
         const ratings = JSON.parse(localStorage.getItem('goRideRatings')||'[]');
         ratings.push({ driverId:driver.id, rating:parseInt(r.value), review:document.getElementById('reviewText')?.value||'', date:new Date().toISOString() });
         localStorage.setItem('goRideRatings', JSON.stringify(ratings));
         updateRideRating(details?.date, parseInt(r.value));
+        showNotification('Evaluare trimisă', 'Vă mulțumim pentru feedback!', 'success');
         closeRating();
     };
     document.getElementById('closeRatingBtn').onclick = closeRating;
@@ -1460,9 +1676,10 @@ function displayRideHistory() {
 }
 
 function clearRideHistory() {
-    if (!currentUser||!confirm('Ștergeți?')) return;
+    if (!currentUser||!confirm('Sigur doriți să ștergeți tot istoricul?')) return;
     localStorage.removeItem(`goRideHistory_${currentUser.id}`);
     displayRideHistory();
+    showNotification('Istoric șters', 'Istoricul curselor a fost șters cu succes.', 'success');
 }
 
 // ============ AUTH ============
@@ -1480,31 +1697,67 @@ function updateNavAndUI() {
     }
 }
 
-function logoutUser() { sessionStorage.removeItem('goRideCurrentUser'); currentUser = null; updateNavAndUI(); switchToLoginForm(); }
+function logoutUser() { 
+    sessionStorage.removeItem('goRideCurrentUser'); 
+    currentUser = null; 
+    updateNavAndUI(); 
+    switchToLoginForm();
+    showNotification('Deconectare', 'V-ați deconectat cu succes.', 'info');
+}
 
 function registerUser(name, email, phone, password) {
-    if (!email.trim()&&!phone.trim()||password.length<6) return false;
-    if (users.find(u=>u.email===email||u.phone===phone)) return false;
+    if (!email.trim()&&!phone.trim()||password.length<6) {
+        showNotification('Eroare înregistrare', 'Completați toate câmpurile obligatorii.', 'error');
+        return false;
+    }
+    if (users.find(u=>u.email===email||u.phone===phone)) {
+        showNotification('Eroare înregistrare', 'Utilizatorul există deja.', 'error');
+        return false;
+    }
     users.push({ id:Date.now(), name, email, phone, password });
     saveUsers();
     switchToLoginForm();
+    showNotification('Înregistrare reușită', 'Contul a fost creat cu succes. Acum vă puteți autentifica.', 'success');
     return true;
 }
 
 function loginUser(id, pass) {
     const user = users.find(u=>(u.email===id||u.phone===id)&&u.password===pass);
-    if (user) { currentUser = { id:user.id, name:user.name, email:user.email, phone:user.phone }; sessionStorage.setItem('goRideCurrentUser', JSON.stringify(currentUser)); updateNavAndUI(); return true; }
+    if (user) { 
+        currentUser = { id:user.id, name:user.name, email:user.email, phone:user.phone }; 
+        sessionStorage.setItem('goRideCurrentUser', JSON.stringify(currentUser)); 
+        updateNavAndUI(); 
+        showNotification('Autentificare reușită', `Bun venit, ${user.name}!`, 'success');
+        return true; 
+    }
+    showNotification('Eroare autentificare', 'Email/telefon sau parolă incorecte.', 'error');
     return false;
 }
 
 let pendingReset = null;
-function requestReset(c) { const u = users.find(u=>u.email===c||u.phone===c); if (!u) return false; pendingReset = c; document.getElementById('resetCodeSection').style.display = 'block'; return true; }
+function requestReset(c) { 
+    const u = users.find(u=>u.email===c||u.phone===c); 
+    if (!u) {
+        showNotification('Eroare resetare', 'Contul nu a fost găsit.', 'error');
+        return false; 
+    }
+    pendingReset = c; 
+    document.getElementById('resetCodeSection').style.display = 'block'; 
+    showNotification('Cod trimis', 'Un cod de resetare a fost trimis (demo: 123456).', 'info');
+    return true; 
+}
+
 function confirmReset(code, pass) {
-    if (code!=='123456'||!pass||pass.length<6) return false;
+    if (code!=='123456'||!pass||pass.length<6) {
+        showNotification('Eroare resetare', 'Cod invalid sau parolă prea scurtă.', 'error');
+        return false;
+    }
     const i = users.findIndex(u=>u.email===pendingReset||u.phone===pendingReset);
     if (i===-1) return false;
     users[i].password = pass; saveUsers();
-    document.getElementById('resetCodeSection').style.display = 'none'; pendingReset = null; switchToLoginForm(); return true;
+    document.getElementById('resetCodeSection').style.display = 'none'; pendingReset = null; switchToLoginForm(); 
+    showNotification('Parolă resetată', 'Parola a fost resetată cu succes.', 'success');
+    return true;
 }
 
 function switchToLoginForm() {
@@ -1527,6 +1780,11 @@ function switchToForgotForm() {
 document.addEventListener('DOMContentLoaded', () => {
     updateNavAndUI();
     
+    // Welcome notification
+    if (currentUser) {
+        showNotification('Bun venit', `Bine ați revenit, ${currentUser.name}!`, 'success', 4000);
+    }
+    
     document.getElementById('menuToggle')?.addEventListener('click', function() {
         const expanded = document.getElementById('navLinks').classList.toggle('show');
         this.setAttribute('aria-expanded', expanded);
@@ -1548,25 +1806,22 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('doLoginBtn')?.addEventListener('click', () => {
         const id = document.getElementById('loginEmailPhone').value.trim(), pass = document.getElementById('loginPassword').value;
         if (!id||!pass) { showAuthMessage('Completează câmpurile'); return; }
-        if (!loginUser(id, pass)) showAuthMessage('Date incorecte');
+        loginUser(id, pass);
     });
     
     document.getElementById('doRegisterBtn')?.addEventListener('click', () => {
         const name = document.getElementById('regName').value.trim(), email = document.getElementById('regEmail').value.trim(), phone = document.getElementById('regPhone').value.trim(), pass = document.getElementById('regPassword').value;
         if (!name||(!email&&!phone)) { showAuthMessage('Completează câmpurile'); return; }
-        if (registerUser(name, email, phone, pass)) showAuthMessage('Cont creat!', false);
-        else showAuthMessage('Eroare la înregistrare');
+        registerUser(name, email, phone, pass);
     });
     
     document.getElementById('sendResetBtn')?.addEventListener('click', () => {
         const c = document.getElementById('resetContact').value.trim();
         if (!c || !requestReset(c)) showAuthMessage('Cont inexistent');
-        else showAuthMessage('Cod demo: 123456', false);
     });
     
     document.getElementById('confirmResetBtn')?.addEventListener('click', () => {
-        if (confirmReset(document.getElementById('resetCode').value.trim(), document.getElementById('newPassword').value)) showAuthMessage('Parolă resetată!', false);
-        else showAuthMessage('Cod invalid');
+        confirmReset(document.getElementById('resetCode').value.trim(), document.getElementById('newPassword').value);
     });
     
     document.getElementById('logoutBtnMain')?.addEventListener('click', logoutUser);
@@ -1578,12 +1833,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentRoutes.length) return;
         const route = currentRoutes[selectedRouteIndex], price = calcDynamicPrice(route.distance/1000, Math.round(route.duration/60));
         if (selectedDriver) showRideDetails(route, selectedDriver, document.getElementById('startPoint').value, document.getElementById('endPoint').value, price);
+        else showNotification('Selectați șofer', 'Trebuie să selectați un șofer mai întâi.', 'warning');
     });
     
     document.getElementById('confirmRideFinalBtn')?.addEventListener('click', confirmFinalRide);
     document.getElementById('cancelRideBtn')?.addEventListener('click', cancelRide);
     
     window.addEventListener('beforeunload', () => { if (trackingInterval) clearInterval(trackingInterval); });
+    
+    // Handle window resize for map
+    window.addEventListener('resize', () => {
+        if (map) {
+            setTimeout(() => map.invalidateSize(), 100);
+        }
+    });
 });
 </script>
 </body>
